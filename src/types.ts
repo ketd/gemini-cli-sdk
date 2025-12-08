@@ -16,7 +16,7 @@ export interface GeminiOptions {
 
   /**
    * Google AI API Key
-   * Can also be set via GOOGLE_API_KEY environment variable
+   * Can also be set via GEMINI_API_KEY environment variable
    */
   apiKey?: string;
 
@@ -133,6 +133,7 @@ export interface InitEvent extends BaseJsonStreamEvent {
   type: JsonStreamEventType.INIT;
   session_id: string;
   model: string;
+  conversation_file_path?: string; // Added for AoE Desktop integration
 }
 
 /**

@@ -58,8 +58,8 @@ function buildCliArgs(options: GeminiOptions, prompt: string): string[] {
     args.push('--debug');
   }
 
-  // Positional argument: user prompt
-  args.push('--', prompt);
+  // Positional argument: user prompt (no -- needed)
+  args.push(prompt);
 
   return args;
 }
@@ -73,14 +73,48 @@ function buildEnv(options: GeminiOptions): NodeJS.ProcessEnv {
     ...options.env,
   };
 
-  // API Key
+  // Auto-detect Vertex AI mode by API key prefix
+  // Vertex AI keys start with "AQ." (e.g., AQ.Ab8RN6K...)
+  // Standard Gemini API keys start with "AI..." (e.g., AIzaSy...)
+  const isVertexAIKey = options.apiKey?.startsWith('AQ.');
+  const useVertexAI = isVertexAIKey || env.GOOGLE_GENAI_USE_VERTEXAI === 'true';
+
+  // API Key - Gemini CLI requires GEMINI_API_KEY (or GOOGLE_API_KEY for Vertex AI)
   if (options.apiKey) {
-    env.GOOGLE_API_KEY = options.apiKey;
+    if (useVertexAI) {
+      // Vertex AI mode: use GOOGLE_API_KEY
+      env.GOOGLE_API_KEY = options.apiKey;
+      env.GOOGLE_GENAI_USE_VERTEXAI = 'true';
+      if (options.debug) {
+        console.log('[SDK] Vertex AI mode: Setting GOOGLE_API_KEY:', options.apiKey.substring(0, 10) + '...');
+      }
+    } else {
+      // Standard mode: use GEMINI_API_KEY
+      env.GEMINI_API_KEY = options.apiKey;
+      if (options.debug) {
+        console.log('[SDK] Standard mode: Setting GEMINI_API_KEY:', options.apiKey.substring(0, 10) + '...');
+      }
+    }
+  }
+
+  // Unset GOOGLE_API_KEY to prevent Gemini CLI from using it (unless using Vertex AI)
+  // (Gemini CLI prefers GOOGLE_API_KEY over GEMINI_API_KEY when both are set)
+  if (!useVertexAI && env.GOOGLE_API_KEY) {
+    delete env.GOOGLE_API_KEY;
+    if (options.debug) {
+      console.log('[SDK] Removed GOOGLE_API_KEY from environment (not using Vertex AI)');
+    }
   }
 
   // Debug mode
   if (options.debug) {
     env.DEBUG = '1';
+    console.log('[SDK] Environment variables set:', {
+      GEMINI_API_KEY: env.GEMINI_API_KEY ? '***' : undefined,
+      GOOGLE_API_KEY: env.GOOGLE_API_KEY ? '***' : undefined,
+      GOOGLE_GENAI_USE_VERTEXAI: env.GOOGLE_GENAI_USE_VERTEXAI,
+      GEMINI_CONFIG_DIR: env.GEMINI_CONFIG_DIR,
+    });
   }
 
   return env;
@@ -119,9 +153,9 @@ export async function* query(
     throw new GeminiSDKError('pathToGeminiCLI is required');
   }
 
-  if (!options.apiKey && !process.env.GOOGLE_API_KEY) {
+  if (!options.apiKey && !process.env.GEMINI_API_KEY) {
     throw new GeminiSDKError(
-      'apiKey is required (or set GOOGLE_API_KEY environment variable)',
+      'apiKey is required (or set GEMINI_API_KEY environment variable)',
     );
   }
 
