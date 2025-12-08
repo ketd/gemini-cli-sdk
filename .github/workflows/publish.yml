@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
+      id-token: write  # Required for OIDC/Trusted Publishers
 
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,18 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Publish to npm
-        run: pnpm publish --no-git-checks --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Method 1: Trusted Publishers (OIDC) - Recommended for 2025+
+      # No token needed! npm will automatically authenticate via OIDC
+      # Prerequisites:
+      #   1. Configure Trusted Publisher on npmjs.com (Settings → Publishing Access)
+      #   2. Add GitHub Actions as trusted publisher
+      - name: Publish to npm (via Trusted Publishers)
+        run: pnpm publish --provenance --access public --no-git-checks
+        # No NODE_AUTH_TOKEN needed with Trusted Publishers!
+
+      # Method 2: Traditional Token (Fallback)
+      # Uncomment if you prefer using npm token instead of Trusted Publishers
+      # - name: Publish to npm (via Token)
+      #   run: pnpm publish --no-git-checks --access public
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
