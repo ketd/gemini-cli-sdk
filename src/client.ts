@@ -67,6 +67,44 @@ export class GeminiClient extends EventEmitter {
           this.emit('session', event.session_id);
         }
 
+        // Handle permission request for tool execution
+        if (event.type === JsonStreamEventType.TOOL_USE && this.options.onPermissionRequest) {
+          const permissionRequest = {
+            toolId: event.tool_id,
+            toolName: event.tool_name,
+            parameters: event.parameters,
+            timestamp: event.timestamp,
+          };
+
+          try {
+            const decision = await this.options.onPermissionRequest(permissionRequest);
+
+            // Emit permission decision event
+            this.emit('permission', {
+              request: permissionRequest,
+              decision,
+            });
+
+            // Note: Since Gemini CLI has already executed the tool (approvalMode handling),
+            // we can only log the decision here. To actually prevent execution,
+            // use approvalMode='default' and handle stdin/stdout interaction.
+            if (!decision.approved) {
+              this.emit('warning', {
+                type: JsonStreamEventType.ERROR,
+                severity: 'warning',
+                message: `Tool ${event.tool_name} was denied by permission callback but may have already executed`,
+                timestamp: new Date().toISOString(),
+              });
+            }
+          } catch (error) {
+            this.emit('error', {
+              message: `Permission callback error for tool ${event.tool_name}`,
+              error,
+            });
+            // Continue processing even if permission callback fails
+          }
+        }
+
         // Emit event
         this.emit('event', event);
 

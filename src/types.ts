@@ -91,6 +91,42 @@ export interface GeminiOptions {
    * @default undefined (no timeout)
    */
   timeout?: number;
+
+  /**
+   * Permission callback for tool execution
+   * Called when a tool requires approval (when approvalMode is 'default')
+   * Return true to approve, false to deny
+   * If not provided, falls back to Gemini CLI's built-in approval mechanism
+   */
+  onPermissionRequest?: (request: ToolPermissionRequest) => Promise<ToolPermissionDecision>;
+}
+
+/**
+ * Tool permission request
+ */
+export interface ToolPermissionRequest {
+  /** Unique tool call ID */
+  toolId: string;
+
+  /** Tool name (e.g., 'write_file', 'run_shell_command') */
+  toolName: string;
+
+  /** Tool parameters */
+  parameters: Record<string, unknown>;
+
+  /** Timestamp of the request */
+  timestamp: string;
+}
+
+/**
+ * Tool permission decision from host application
+ */
+export interface ToolPermissionDecision {
+  /** Whether to approve the tool execution */
+  approved: boolean;
+
+  /** Optional reason for the decision (for logging) */
+  reason?: string;
 }
 
 /**
@@ -262,7 +298,10 @@ export class GeminiSDKError extends Error {
   ) {
     super(message);
     this.name = 'GeminiSDKError';
-    Error.captureStackTrace(this, GeminiSDKError);
+    // captureStackTrace is available in V8 (Node.js) but not in all environments
+    if (typeof (Error as any).captureStackTrace === 'function') {
+      (Error as any).captureStackTrace(this, GeminiSDKError);
+    }
   }
 }
 
