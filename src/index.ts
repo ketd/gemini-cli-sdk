@@ -47,6 +47,8 @@ export type {
   ResultEvent,
   StreamStats,
   QueryResult,
+  ToolPermissionRequest,
+  ToolPermissionDecision,
 } from './types';
 
 export { JsonStreamEventType, ExitCode, ProcessStatus, GeminiSDKError } from './types';
