@@ -355,3 +355,102 @@ export interface QueryResult {
     message: string;
   };
 }
+
+/**
+ * Input message types for Stream Client (SDK → CLI via stdin)
+ */
+export enum JsonInputMessageType {
+  /** User message */
+  USER = 'user',
+
+  /** Control command */
+  CONTROL = 'control',
+}
+
+/**
+ * User message sent to CLI
+ */
+export interface UserInputMessage {
+  type: JsonInputMessageType.USER;
+  content: string;
+  session_id?: string;
+}
+
+/**
+ * Control message sent to CLI
+ */
+export interface ControlInputMessage {
+  type: JsonInputMessageType.CONTROL;
+  control: {
+    subtype: 'interrupt' | 'cancel' | 'shutdown';
+  };
+  session_id?: string;
+}
+
+/**
+ * Union type for input messages
+ */
+export type JsonInputMessage = UserInputMessage | ControlInputMessage;
+
+/**
+ * Options for GeminiStreamClient
+ */
+export interface GeminiStreamOptions {
+  /**
+   * Path to Gemini CLI executable
+   * @example 'node_modules/@google/gemini-cli/bundle/gemini.js'
+   */
+  pathToGeminiCLI: string;
+
+  /**
+   * Session ID for this client instance
+   * Each client manages one session
+   */
+  sessionId: string;
+
+  /**
+   * Workspace ID (optional, for tracking)
+   */
+  workspaceId?: string;
+
+  /**
+   * Google AI API Key
+   * Can also be set via GEMINI_API_KEY environment variable
+   */
+  apiKey?: string;
+
+  /**
+   * Model name
+   * @default 'gemini-2.0-flash-exp'
+   */
+  model?: string;
+
+  /**
+   * Working directory for CLI execution
+   * @default process.cwd()
+   */
+  cwd?: string;
+
+  /**
+   * Approval mode for tool execution
+   * @default 'default'
+   */
+  approvalMode?: 'default' | 'auto_edit' | 'yolo';
+
+  /**
+   * Custom environment variables
+   */
+  env?: Record<string, string>;
+
+  /**
+   * Enable debug mode
+   * @default false
+   */
+  debug?: boolean;
+
+  /**
+   * Timeout for process initialization (ms)
+   * @default 30000
+   */
+  initTimeout?: number;
+}

@@ -32,17 +32,23 @@
 // Core functions
 export { query } from './query';
 
-// Client
+// Clients
 export { GeminiClient } from './client';
+export { GeminiStreamClient } from './streamClient';
 
 // Types
 export type {
   GeminiOptions,
+  GeminiStreamOptions,
   JsonStreamEvent,
+  JsonInputMessage,
+  UserInputMessage,
+  ControlInputMessage,
   InitEvent,
   MessageEvent,
   ToolUseEvent,
   ToolResultEvent,
+  ThoughtEvent,
   ErrorEvent,
   ResultEvent,
   StreamStats,
@@ -51,7 +57,7 @@ export type {
   ToolPermissionDecision,
 } from './types';
 
-export { JsonStreamEventType, ExitCode, ProcessStatus, GeminiSDKError } from './types';
+export { JsonStreamEventType, JsonInputMessageType, ExitCode, ProcessStatus, GeminiSDKError } from './types';
 
 // Utilities
 export { findGeminiCLI, validateApiKey, getApiKey, validateModel, formatDuration, formatTokens } from './utils';
