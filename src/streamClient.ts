@@ -125,6 +125,10 @@ export class GeminiStreamClient extends EventEmitter {
     // Setup stdin stream
     if (this.process.stdin) {
       this.stdinStream = this.process.stdin;
+      // CRITICAL: Set encoding to prevent stdin from auto-closing
+      this.stdinStream.setDefaultEncoding('utf-8');
+      // IMPORTANT: Don't end stdin prematurely - keep it alive
+      // The readline loop in CLI will wait for messages
     } else {
       throw new GeminiSDKError('Failed to get stdin stream');
     }
@@ -329,7 +333,21 @@ export class GeminiStreamClient extends EventEmitter {
     }
 
     const json = JSON.stringify(message);
-    this.stdinStream.write(json + '\n');
+    if (this.options.debug) {
+      console.log('[GeminiStreamClient] Writing message to stdin:', json.substring(0, 100));
+    }
+
+    const success = this.stdinStream.write(json + '\n', (error) => {
+      if (error) {
+        console.error('[GeminiStreamClient] Write error:', error);
+      } else if (this.options.debug) {
+        console.log('[GeminiStreamClient] Write callback: message flushed to stdin');
+      }
+    });
+
+    if (this.options.debug) {
+      console.log('[GeminiStreamClient] Write success:', success, 'Stream writable:', this.stdinStream.writable);
+    }
   }
 
   /**
