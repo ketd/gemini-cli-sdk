@@ -146,10 +146,13 @@ export class GeminiStreamClient extends EventEmitter {
       throw new GeminiSDKError('Failed to get stdout stream');
     }
 
-    // Handle stderr (for debugging)
-    if (this.process.stderr && this.options.debug) {
+    // Handle stderr (always process to prevent mixing with stdout)
+    if (this.process.stderr) {
       this.process.stderr.on('data', (chunk) => {
-        console.error('[GeminiStreamClient] stderr:', chunk.toString());
+        // Only log in debug mode, but always consume stderr
+        if (this.options.debug) {
+          console.error('[GeminiStreamClient] stderr:', chunk.toString());
+        }
       });
     }
 
@@ -318,7 +321,14 @@ export class GeminiStreamClient extends EventEmitter {
 
     // Set API key if provided
     if (this.options.apiKey) {
-      env.GEMINI_API_KEY = this.options.apiKey;
+      // For Vertex AI mode, use GOOGLE_API_KEY
+      // For Google AI Studio, use GEMINI_API_KEY
+      const useVertexAI = this.options.env?.GOOGLE_GENAI_USE_VERTEXAI === 'true';
+      if (useVertexAI) {
+        env.GOOGLE_API_KEY = this.options.apiKey;
+      } else {
+        env.GEMINI_API_KEY = this.options.apiKey;
+      }
     }
 
     return env;
