@@ -13,7 +13,6 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import * as readline from 'node:readline';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import type { Writable } from 'node:stream';
 import {
   GeminiStreamOptions,
@@ -173,8 +172,10 @@ export class GeminiStreamClient extends EventEmitter {
 
   /**
    * Send a user message to the CLI
+   * @param content - User message content
+   * @param temporarySystemInstruction - Optional temporary system instruction to append for this request only
    */
-  async sendMessage(content: string): Promise<void> {
+  async sendMessage(content: string, temporarySystemInstruction?: string): Promise<void> {
     if (!this.isReady()) {
       throw new GeminiSDKError('Client not ready. Call start() first.');
     }
@@ -183,6 +184,7 @@ export class GeminiStreamClient extends EventEmitter {
       type: JsonInputMessageType.USER,
       content,
       session_id: this.options.sessionId,
+      temporary_system_instruction: temporarySystemInstruction,
     };
 
     this.writeMessage(message);
@@ -304,11 +306,33 @@ export class GeminiStreamClient extends EventEmitter {
   }
 
   /**
-   * Create temporary settings.json for hooks configuration
+   * Create settings.json in GEMINI_CONFIG_DIR for hooks configuration
+   *
+   * Note: Gemini CLI does not support --settings-file parameter.
+   * Instead, it loads settings from GEMINI_CONFIG_DIR/settings.json
+   * where GEMINI_CONFIG_DIR is set via environment variable.
    */
   private async createTempSettings(): Promise<void> {
-    const tempDir = os.tmpdir();
-    this.tempSettingsPath = path.join(tempDir, `gemini-settings-${this.options.sessionId}.json`);
+    // Get GEMINI_CONFIG_DIR from options.env
+    const geminiConfigDir = this.options.env?.GEMINI_CONFIG_DIR;
+
+    if (!geminiConfigDir) {
+      throw new GeminiSDKError(
+        'GEMINI_CONFIG_DIR is required in options.env when using hooks. ' +
+        'Please set options.env.GEMINI_CONFIG_DIR to a directory path.'
+      );
+    }
+
+    // Ensure the directory exists
+    if (!fs.existsSync(geminiConfigDir)) {
+      fs.mkdirSync(geminiConfigDir, { recursive: true });
+      if (this.options.debug) {
+        console.log('[GeminiStreamClient] Created config directory:', geminiConfigDir);
+      }
+    }
+
+    // Write settings.json to GEMINI_CONFIG_DIR
+    this.tempSettingsPath = path.join(geminiConfigDir, 'settings.json');
 
     const settings = {
       tools: {
@@ -320,11 +344,11 @@ export class GeminiStreamClient extends EventEmitter {
     try {
       fs.writeFileSync(this.tempSettingsPath, JSON.stringify(settings, null, 2), 'utf-8');
       if (this.options.debug) {
-        console.log('[GeminiStreamClient] Created temp settings:', this.tempSettingsPath);
+        console.log('[GeminiStreamClient] Wrote settings to:', this.tempSettingsPath);
         console.log('[GeminiStreamClient] Settings content:', JSON.stringify(settings, null, 2));
       }
     } catch (error) {
-      throw new GeminiSDKError(`Failed to create temp settings file: ${error}`);
+      throw new GeminiSDKError(`Failed to write settings file: ${error}`);
     }
   }
 
@@ -339,10 +363,8 @@ export class GeminiStreamClient extends EventEmitter {
       'stream-json',
     ];
 
-    // Settings file (for hooks configuration)
-    if (this.tempSettingsPath) {
-      args.push('--settings-file', this.tempSettingsPath);
-    }
+    // Note: Do NOT use --settings-file as it's not supported by Gemini CLI
+    // Settings are loaded from GEMINI_CONFIG_DIR/settings.json instead
 
     // Resume from previous session file
     if (this.options.resumeSessionFilePath) {

@@ -459,6 +459,8 @@ export interface UserInputMessage {
   type: JsonInputMessageType.USER;
   content: string;
   session_id?: string;
+  /** Optional temporary system instruction to append for this request only */
+  temporary_system_instruction?: string;
 }
 
 /**

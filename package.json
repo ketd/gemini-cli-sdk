@@ -1,6 +1,6 @@
 {
   "name": "@ketd/gemini-cli-sdk",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "description": "TypeScript SDK for Google Gemini CLI - spawn and interact with Gemini CLI as a subprocess",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
