@@ -11,6 +11,9 @@
 import { EventEmitter } from 'node:events';
 import { spawn, type ChildProcess } from 'node:child_process';
 import * as readline from 'node:readline';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import type { Writable } from 'node:stream';
 import {
   GeminiStreamOptions,
@@ -77,6 +80,7 @@ export class GeminiStreamClient extends EventEmitter {
   private status: ProcessStatus = ProcessStatus.IDLE;
   private initEvent: InitEvent | null = null;
   private initTimeout: NodeJS.Timeout | null = null;
+  private tempSettingsPath: string | null = null;
 
   constructor(private options: GeminiStreamOptions) {
     super();
@@ -99,6 +103,11 @@ export class GeminiStreamClient extends EventEmitter {
     }
 
     this.status = ProcessStatus.RUNNING;
+
+    // Create temporary settings.json if hooks are configured
+    if (this.options.hooks) {
+      await this.createTempSettings();
+    }
 
     // Build command arguments
     const args = this.buildCommand();
@@ -251,6 +260,19 @@ export class GeminiStreamClient extends EventEmitter {
 
     this.process = null;
     this.status = ProcessStatus.COMPLETED;
+
+    // Clean up temporary settings file
+    if (this.tempSettingsPath) {
+      try {
+        fs.unlinkSync(this.tempSettingsPath);
+        if (this.options.debug) {
+          console.log('[GeminiStreamClient] Cleaned up temp settings:', this.tempSettingsPath);
+        }
+      } catch (error) {
+        console.error('[GeminiStreamClient] Failed to clean up temp settings:', error);
+      }
+      this.tempSettingsPath = null;
+    }
   }
 
   /**
@@ -282,6 +304,31 @@ export class GeminiStreamClient extends EventEmitter {
   }
 
   /**
+   * Create temporary settings.json for hooks configuration
+   */
+  private async createTempSettings(): Promise<void> {
+    const tempDir = os.tmpdir();
+    this.tempSettingsPath = path.join(tempDir, `gemini-settings-${this.options.sessionId}.json`);
+
+    const settings = {
+      tools: {
+        enableHooks: true,
+      },
+      hooks: this.options.hooks,
+    };
+
+    try {
+      fs.writeFileSync(this.tempSettingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+      if (this.options.debug) {
+        console.log('[GeminiStreamClient] Created temp settings:', this.tempSettingsPath);
+        console.log('[GeminiStreamClient] Settings content:', JSON.stringify(settings, null, 2));
+      }
+    } catch (error) {
+      throw new GeminiSDKError(`Failed to create temp settings file: ${error}`);
+    }
+  }
+
+  /**
    * Build CLI command arguments
    */
   private buildCommand(): string[] {
@@ -291,6 +338,19 @@ export class GeminiStreamClient extends EventEmitter {
       '--output-format',
       'stream-json',
     ];
+
+    // Settings file (for hooks configuration)
+    if (this.tempSettingsPath) {
+      args.push('--settings-file', this.tempSettingsPath);
+    }
+
+    // Resume from previous session file
+    if (this.options.resumeSessionFilePath) {
+      args.push('--resume-from-file', this.options.resumeSessionFilePath);
+      if (this.options.debug) {
+        console.log('[GeminiStreamClient] Resuming from session file:', this.options.resumeSessionFilePath);
+      }
+    }
 
     // Model
     if (this.options.model) {
@@ -324,11 +384,30 @@ export class GeminiStreamClient extends EventEmitter {
       // For Vertex AI mode, use GOOGLE_API_KEY
       // For Google AI Studio, use GEMINI_API_KEY
       const useVertexAI = this.options.env?.GOOGLE_GENAI_USE_VERTEXAI === 'true';
+
+      if (this.options.debug) {
+        console.log('[GeminiStreamClient] buildEnv() - API Key prefix:', this.options.apiKey.substring(0, 3));
+        console.log('[GeminiStreamClient] buildEnv() - GOOGLE_GENAI_USE_VERTEXAI:', this.options.env?.GOOGLE_GENAI_USE_VERTEXAI);
+        console.log('[GeminiStreamClient] buildEnv() - useVertexAI:', useVertexAI);
+      }
+
       if (useVertexAI) {
         env.GOOGLE_API_KEY = this.options.apiKey;
+        if (this.options.debug) {
+          console.log('[GeminiStreamClient] buildEnv() - Setting GOOGLE_API_KEY for Vertex AI');
+        }
       } else {
         env.GEMINI_API_KEY = this.options.apiKey;
+        if (this.options.debug) {
+          console.log('[GeminiStreamClient] buildEnv() - Setting GEMINI_API_KEY for AI Studio');
+        }
       }
+    }
+
+    if (this.options.debug) {
+      console.log('[GeminiStreamClient] buildEnv() - Final env has GOOGLE_API_KEY:', !!env.GOOGLE_API_KEY);
+      console.log('[GeminiStreamClient] buildEnv() - Final env has GEMINI_API_KEY:', !!env.GEMINI_API_KEY);
+      console.log('[GeminiStreamClient] buildEnv() - Final env GOOGLE_GENAI_USE_VERTEXAI:', env.GOOGLE_GENAI_USE_VERTEXAI);
     }
 
     return env;
@@ -371,6 +450,14 @@ export class GeminiStreamClient extends EventEmitter {
     this.readlineInterface.on('line', (line) => {
       const trimmed = line.trim();
       if (!trimmed) {
+        return;
+      }
+
+      // Skip debug output lines (e.g., [MESSAGE_BUS], [PolicyEngine], etc.)
+      if (trimmed.startsWith('[')) {
+        if (this.options.debug) {
+          console.log('[GeminiStreamClient] Skipping debug output:', trimmed.substring(0, 100));
+        }
         return;
       }
 

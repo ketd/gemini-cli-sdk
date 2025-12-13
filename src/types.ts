@@ -133,6 +133,7 @@ export interface ToolPermissionDecision {
  * JSON Stream Event Types
  *
  * Based on: @google/gemini-cli/packages/core/src/output/types.ts
+ * Plus additional event types actually sent by CLI
  */
 export enum JsonStreamEventType {
   /** Session initialization */
@@ -141,8 +142,11 @@ export enum JsonStreamEventType {
   /** Message content (user/assistant) */
   MESSAGE = 'message',
 
-  /** Tool call request */
+  /** Tool call request (legacy) */
   TOOL_USE = 'tool_use',
+
+  /** Tool call request (new format) */
+  TOOL_CALL_REQUEST = 'tool_call_request',
 
   /** Tool execution result */
   TOOL_RESULT = 'tool_result',
@@ -155,6 +159,16 @@ export enum JsonStreamEventType {
 
   /** Final result */
   RESULT = 'result',
+
+  // Additional event types actually sent by Gemini CLI
+  /** Message content chunk (streaming) */
+  CONTENT = 'content',
+
+  /** Message completion with metadata */
+  FINISHED = 'finished',
+
+  /** Model information */
+  MODEL_INFO = 'model_info',
 }
 
 /**
@@ -186,13 +200,27 @@ export interface MessageEvent extends BaseJsonStreamEvent {
 }
 
 /**
- * Tool call event
+ * Tool call event (legacy format)
  */
 export interface ToolUseEvent extends BaseJsonStreamEvent {
   type: JsonStreamEventType.TOOL_USE;
   tool_name: string;
   tool_id: string;
   parameters: Record<string, unknown>;
+}
+
+/**
+ * Tool call request event (new format)
+ */
+export interface ToolCallRequestEvent extends BaseJsonStreamEvent {
+  type: JsonStreamEventType.TOOL_CALL_REQUEST;
+  value: {
+    callId: string;
+    name: string;
+    args: Record<string, unknown>;
+    isClientInitiated: boolean;
+    prompt_id: string;
+  };
 }
 
 /**
@@ -210,12 +238,22 @@ export interface ToolResultEvent extends BaseJsonStreamEvent {
 }
 
 /**
+ * Thought summary containing subject and description
+ */
+export interface ThoughtSummary {
+  subject: string;
+  description?: string;
+}
+
+/**
  * Thought/reasoning event
+ * Emitted by Gemini CLI when the model is thinking
  */
 export interface ThoughtEvent extends BaseJsonStreamEvent {
   type: JsonStreamEventType.THOUGHT;
   subject: string;
   description?: string;
+  traceId?: string;
 }
 
 /**
@@ -252,16 +290,63 @@ export interface ResultEvent extends BaseJsonStreamEvent {
 }
 
 /**
+ * Content event (streaming message chunk)
+ * This is the actual event type sent by Gemini CLI for message content
+ */
+export interface ContentEvent extends BaseJsonStreamEvent {
+  type: JsonStreamEventType.CONTENT;
+  value: string;
+  traceId?: string;
+}
+
+/**
+ * Finished event (message completion with metadata)
+ */
+export interface FinishedEvent extends BaseJsonStreamEvent {
+  type: JsonStreamEventType.FINISHED;
+  value: {
+    reason: string;
+    usageMetadata?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+      totalTokenCount?: number;
+      trafficType?: string;
+      promptTokensDetails?: Array<{
+        modality: string;
+        tokenCount: number;
+      }>;
+      candidatesTokensDetails?: Array<{
+        modality: string;
+        tokenCount: number;
+      }>;
+      thoughtsTokenCount?: number;
+    };
+  };
+}
+
+/**
+ * Model information event
+ */
+export interface ModelInfoEvent extends BaseJsonStreamEvent {
+  type: JsonStreamEventType.MODEL_INFO;
+  value: string;
+}
+
+/**
  * Union type of all JSON stream events
  */
 export type JsonStreamEvent =
   | InitEvent
   | MessageEvent
   | ToolUseEvent
+  | ToolCallRequestEvent
   | ToolResultEvent
   | ThoughtEvent
   | ErrorEvent
-  | ResultEvent;
+  | ResultEvent
+  | ContentEvent
+  | FinishedEvent
+  | ModelInfoEvent;
 
 /**
  * Gemini CLI exit codes
@@ -393,6 +478,36 @@ export interface ControlInputMessage {
 export type JsonInputMessage = UserInputMessage | ControlInputMessage;
 
 /**
+ * Hook configuration types (from Gemini CLI)
+ */
+export interface HookConfig {
+  type: 'command';
+  command: string;
+  timeout?: number;
+}
+
+export interface HookDefinition {
+  matcher?: string;
+  sequential?: boolean;
+  hooks: HookConfig[];
+}
+
+export interface HooksConfiguration {
+  BeforeTool?: HookDefinition[];
+  AfterTool?: HookDefinition[];
+  BeforeAgent?: HookDefinition[];
+  AfterAgent?: HookDefinition[];
+  BeforeModel?: HookDefinition[];
+  AfterModel?: HookDefinition[];
+  BeforeToolSelection?: HookDefinition[];
+  Notification?: HookDefinition[];
+  SessionStart?: HookDefinition[];
+  SessionEnd?: HookDefinition[];
+  PreCompress?: HookDefinition[];
+  disabled?: string[];
+}
+
+/**
  * Options for GeminiStreamClient
  */
 export interface GeminiStreamOptions {
@@ -453,4 +568,17 @@ export interface GeminiStreamOptions {
    * @default 30000
    */
   initTimeout?: number;
+
+  /**
+   * Hooks configuration
+   * Passed to Gemini CLI via temporary settings.json
+   */
+  hooks?: HooksConfiguration;
+
+  /**
+   * Resume from a previous session file path
+   * If provided, Gemini CLI will load the session history using --resume flag
+   * @example '/path/to/session-2025-01-01T12-00-abc123.json'
+   */
+  resumeSessionFilePath?: string;
 }
