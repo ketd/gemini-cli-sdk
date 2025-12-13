@@ -553,6 +553,13 @@ export interface GeminiStreamOptions {
   approvalMode?: 'default' | 'auto_edit' | 'yolo';
 
   /**
+   * List of tools that are allowed to execute
+   * If not specified, all tools are allowed
+   * @example ['read_file', 'write_file', 'run_shell_command']
+   */
+  allowedTools?: string[];
+
+  /**
    * Custom environment variables
    */
   env?: Record<string, string>;
