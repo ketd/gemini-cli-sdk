@@ -114,8 +114,11 @@ export class GeminiStreamClient extends EventEmitter {
     // Build environment variables
     const env = this.buildEnv();
 
+    // Use custom Node.js path if provided, otherwise default to 'node'
+    const nodeExecutable = this.options.pathToNode || 'node';
+
     // Spawn process
-    this.process = spawn('node', args, {
+    this.process = spawn(nodeExecutable, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: this.options.cwd || process.cwd(),
       env,

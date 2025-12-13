@@ -164,10 +164,13 @@ export async function* query(
   const env = buildEnv(options);
   const cwd = options.cwd || process.cwd();
 
+  // Use custom Node.js path if provided, otherwise default to 'node'
+  const nodeExecutable = options.pathToNode || 'node';
+
   // Spawn Gemini CLI subprocess
   let geminiProcess: ChildProcess;
   try {
-    geminiProcess = spawn('node', [options.pathToGeminiCLI, ...args], {
+    geminiProcess = spawn(nodeExecutable, [options.pathToGeminiCLI, ...args], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env,
       cwd,

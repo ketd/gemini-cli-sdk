@@ -15,6 +15,15 @@ export interface GeminiOptions {
   pathToGeminiCLI: string;
 
   /**
+   * Path to Node.js executable (optional)
+   * If not specified, uses 'node' from PATH
+   * Useful for packaged Electron apps with bundled Node.js
+   * @example '/Applications/MyApp.app/Contents/Resources/nodejs/node'
+   * @default 'node'
+   */
+  pathToNode?: string;
+
+  /**
    * Google AI API Key
    * Can also be set via GEMINI_API_KEY environment variable
    */
@@ -518,6 +527,15 @@ export interface GeminiStreamOptions {
    * @example 'node_modules/@google/gemini-cli/bundle/gemini.js'
    */
   pathToGeminiCLI: string;
+
+  /**
+   * Path to Node.js executable (optional)
+   * If not specified, uses 'node' from PATH
+   * Useful for packaged Electron apps with bundled Node.js
+   * @example '/Applications/MyApp.app/Contents/Resources/nodejs/node'
+   * @default 'node'
+   */
+  pathToNode?: string;
 
   /**
    * Session ID for this client instance
