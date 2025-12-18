@@ -103,8 +103,8 @@ export class GeminiStreamClient extends EventEmitter {
 
     this.status = ProcessStatus.RUNNING;
 
-    // Create temporary settings.json if hooks are configured
-    if (this.options.hooks) {
+    // Create temporary settings.json if hooks or mcpServers are configured
+    if (this.options.hooks || this.options.mcpServers) {
       await this.createTempSettings();
     }
 
@@ -309,7 +309,7 @@ export class GeminiStreamClient extends EventEmitter {
   }
 
   /**
-   * Create settings.json in GEMINI_CONFIG_DIR for hooks configuration
+   * Create settings.json in GEMINI_CONFIG_DIR for hooks and MCP servers configuration
    *
    * Note: Gemini CLI does not support --settings-file parameter.
    * Instead, it loads settings from GEMINI_CONFIG_DIR/settings.json
@@ -321,7 +321,7 @@ export class GeminiStreamClient extends EventEmitter {
 
     if (!geminiConfigDir) {
       throw new GeminiSDKError(
-        'GEMINI_CONFIG_DIR is required in options.env when using hooks. ' +
+        'GEMINI_CONFIG_DIR is required in options.env when using hooks or mcpServers. ' +
         'Please set options.env.GEMINI_CONFIG_DIR to a directory path.'
       );
     }
@@ -337,12 +337,21 @@ export class GeminiStreamClient extends EventEmitter {
     // Write settings.json to GEMINI_CONFIG_DIR
     this.tempSettingsPath = path.join(geminiConfigDir, 'settings.json');
 
-    const settings = {
-      tools: {
+    // Build settings object
+    const settings: Record<string, unknown> = {};
+
+    // Add hooks configuration if provided
+    if (this.options.hooks) {
+      settings.tools = {
         enableHooks: true,
-      },
-      hooks: this.options.hooks,
-    };
+      };
+      settings.hooks = this.options.hooks;
+    }
+
+    // Add MCP servers configuration if provided
+    if (this.options.mcpServers) {
+      settings.mcpServers = this.options.mcpServers;
+    }
 
     try {
       fs.writeFileSync(this.tempSettingsPath, JSON.stringify(settings, null, 2), 'utf-8');

@@ -519,6 +519,50 @@ export interface HooksConfiguration {
 }
 
 /**
+ * MCP Server configuration
+ * Used to configure external MCP servers in Gemini CLI
+ */
+export interface MCPServerConfig {
+  /** Command to start the MCP server (for stdio transport) */
+  command?: string;
+
+  /** Arguments for the command */
+  args?: string[];
+
+  /** Working directory */
+  cwd?: string;
+
+  /** Environment variables */
+  env?: Record<string, string>;
+
+  /** URL for SSE transport */
+  url?: string;
+
+  /** URL for HTTP streaming transport */
+  httpUrl?: string;
+
+  /** Custom headers for HTTP transports */
+  headers?: Record<string, string>;
+
+  /** Request timeout in milliseconds (default: 600000 = 10 minutes) */
+  timeout?: number;
+
+  /** When true, bypass all tool call confirmations for this server */
+  trust?: boolean;
+
+  /** List of tool names to include (allowlist) */
+  includeTools?: string[];
+
+  /** List of tool names to exclude */
+  excludeTools?: string[];
+}
+
+/**
+ * MCP Servers configuration map
+ */
+export type MCPServersConfig = Record<string, MCPServerConfig>;
+
+/**
  * Options for GeminiStreamClient
  */
 export interface GeminiStreamOptions {
@@ -601,6 +645,28 @@ export interface GeminiStreamOptions {
    * Passed to Gemini CLI via temporary settings.json
    */
   hooks?: HooksConfiguration;
+
+  /**
+   * MCP Servers configuration
+   * Configures external MCP servers for the CLI to connect to
+   * Passed to Gemini CLI via settings.json mcpServers field
+   *
+   * @example
+   * ```typescript
+   * mcpServers: {
+   *   'skill-sandbox': {
+   *     command: 'python',
+   *     args: ['-m', 'skill_mcp_server'],
+   *     env: {
+   *       SKILL_PATH: '/path/to/skill',
+   *       CONTENT_KEY: 'base64-encoded-key'
+   *     },
+   *     trust: true
+   *   }
+   * }
+   * ```
+   */
+  mcpServers?: MCPServersConfig;
 
   /**
    * Resume from a previous session file path

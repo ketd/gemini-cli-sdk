@@ -55,6 +55,9 @@ export type {
   QueryResult,
   ToolPermissionRequest,
   ToolPermissionDecision,
+  MCPServerConfig,
+  MCPServersConfig,
+  HooksConfiguration,
 } from './types';
 
 export { JsonStreamEventType, JsonInputMessageType, ExitCode, ProcessStatus, GeminiSDKError } from './types';
