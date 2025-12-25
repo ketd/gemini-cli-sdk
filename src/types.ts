@@ -473,13 +473,33 @@ export interface UserInputMessage {
 }
 
 /**
+ * Control subtypes for control messages
+ */
+export type ControlSubtype = 'interrupt' | 'cancel' | 'shutdown' | 'truncate_history';
+
+/**
+ * Interrupt control - stop current processing
+ */
+export interface InterruptControl {
+  subtype: 'interrupt' | 'cancel' | 'shutdown';
+}
+
+/**
+ * Truncate history control - remove messages from a specific index
+ * Used for edit/retry functionality
+ */
+export interface TruncateHistoryControl {
+  subtype: 'truncate_history';
+  /** Index from which to truncate (0-based, inclusive) */
+  fromIndex: number;
+}
+
+/**
  * Control message sent to CLI
  */
 export interface ControlInputMessage {
   type: JsonInputMessageType.CONTROL;
-  control: {
-    subtype: 'interrupt' | 'cancel' | 'shutdown';
-  };
+  control: InterruptControl | TruncateHistoryControl;
   session_id?: string;
 }
 

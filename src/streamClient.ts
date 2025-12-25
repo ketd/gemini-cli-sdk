@@ -213,6 +213,38 @@ export class GeminiStreamClient extends EventEmitter {
   }
 
   /**
+   * Truncate chat history from a specific index
+   *
+   * This sends a control message to the CLI to:
+   * 1. Truncate in-memory history (via GeminiChat.setHistory())
+   * 2. Sync to session.json file (via ChatRecordingService)
+   *
+   * Used for edit/retry functionality where subsequent messages need to be discarded.
+   *
+   * @param fromIndex - Index from which to truncate (0-based, inclusive)
+   */
+  async truncateHistory(fromIndex: number): Promise<void> {
+    if (!this.isReady()) {
+      throw new GeminiSDKError('Client not ready. Call start() first.');
+    }
+
+    if (fromIndex < 0) {
+      throw new GeminiSDKError('fromIndex must be non-negative');
+    }
+
+    const message: JsonInputMessage = {
+      type: JsonInputMessageType.CONTROL,
+      control: {
+        subtype: 'truncate_history',
+        fromIndex,
+      },
+      session_id: this.options.sessionId,
+    };
+
+    this.writeMessage(message);
+  }
+
+  /**
    * Stop the CLI process
    */
   async stop(timeout: number = 5000): Promise<void> {
