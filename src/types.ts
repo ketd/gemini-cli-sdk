@@ -475,7 +475,7 @@ export interface UserInputMessage {
 /**
  * Control subtypes for control messages
  */
-export type ControlSubtype = 'interrupt' | 'cancel' | 'shutdown' | 'truncate_history';
+export type ControlSubtype = 'interrupt' | 'cancel' | 'shutdown' | 'truncate_history' | 'resume_session';
 
 /**
  * Interrupt control - stop current processing
@@ -495,11 +495,21 @@ export interface TruncateHistoryControl {
 }
 
 /**
+ * Resume session control - load history from a session file
+ * Used when warm pool adapter is assigned to a real session
+ */
+export interface ResumeSessionControl {
+  subtype: 'resume_session';
+  /** Path to the session file to resume from */
+  sessionFilePath: string;
+}
+
+/**
  * Control message sent to CLI
  */
 export interface ControlInputMessage {
   type: JsonInputMessageType.CONTROL;
-  control: InterruptControl | TruncateHistoryControl;
+  control: InterruptControl | TruncateHistoryControl | ResumeSessionControl;
   session_id?: string;
 }
 

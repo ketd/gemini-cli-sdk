@@ -245,6 +245,38 @@ export class GeminiStreamClient extends EventEmitter {
   }
 
   /**
+   * Resume session from a session file
+   *
+   * This sends a control message to the CLI to:
+   * 1. Load history from the specified session file
+   * 2. Update the ChatRecordingService to use the session file
+   *
+   * Used when a warm pool adapter is assigned to a real session that has history.
+   *
+   * @param sessionFilePath - Path to the session file to resume from
+   */
+  async resumeSession(sessionFilePath: string): Promise<void> {
+    if (!this.isReady()) {
+      throw new GeminiSDKError('Client not ready. Call start() first.');
+    }
+
+    if (!sessionFilePath) {
+      throw new GeminiSDKError('sessionFilePath is required');
+    }
+
+    const message: JsonInputMessage = {
+      type: JsonInputMessageType.CONTROL,
+      control: {
+        subtype: 'resume_session',
+        sessionFilePath,
+      },
+      session_id: this.options.sessionId,
+    };
+
+    this.writeMessage(message);
+  }
+
+  /**
    * Stop the CLI process
    */
   async stop(timeout: number = 5000): Promise<void> {

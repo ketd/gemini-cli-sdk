@@ -46,6 +46,7 @@ export type {
   ControlInputMessage,
   InterruptControl,
   TruncateHistoryControl,
+  ResumeSessionControl,
   ControlSubtype,
   InitEvent,
   MessageEvent,
