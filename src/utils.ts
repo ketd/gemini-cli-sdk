@@ -4,6 +4,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
+import { sdkLogger } from './logger.js';
 
 /**
  * Find Gemini CLI executable path
@@ -101,7 +102,7 @@ export function validateModel(model?: string): string {
 
   // Basic validation: should start with 'gemini-'
   if (!model.startsWith('gemini-')) {
-    console.warn(`Warning: Model name "${model}" does not start with "gemini-"`);
+    sdkLogger.warn(`Warning: Model name "${model}" does not start with "gemini-"`);
   }
 
   return model;

@@ -8,6 +8,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import * as readline from 'readline';
 import type { GeminiOptions, JsonStreamEvent } from './types';
 import { GeminiSDKError, ExitCode } from './types';
+import { createLogger, LogLevel, type SDKLogger } from './logger.js';
 
 /**
  * Build CLI arguments from options
@@ -67,7 +68,7 @@ function buildCliArgs(options: GeminiOptions, prompt: string): string[] {
 /**
  * Build environment variables
  */
-function buildEnv(options: GeminiOptions): NodeJS.ProcessEnv {
+function buildEnv(options: GeminiOptions, logger: SDKLogger): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ...options.env,
@@ -85,15 +86,11 @@ function buildEnv(options: GeminiOptions): NodeJS.ProcessEnv {
       // Vertex AI mode: use GOOGLE_API_KEY
       env.GOOGLE_API_KEY = options.apiKey;
       env.GOOGLE_GENAI_USE_VERTEXAI = 'true';
-      if (options.debug) {
-        console.log('[SDK] Vertex AI mode: Setting GOOGLE_API_KEY:', options.apiKey.substring(0, 10) + '...');
-      }
+      logger.debug('Vertex AI mode: Setting GOOGLE_API_KEY:', options.apiKey.substring(0, 10) + '...');
     } else {
       // Standard mode: use GEMINI_API_KEY
       env.GEMINI_API_KEY = options.apiKey;
-      if (options.debug) {
-        console.log('[SDK] Standard mode: Setting GEMINI_API_KEY:', options.apiKey.substring(0, 10) + '...');
-      }
+      logger.debug('Standard mode: Setting GEMINI_API_KEY:', options.apiKey.substring(0, 10) + '...');
     }
   }
 
@@ -101,15 +98,13 @@ function buildEnv(options: GeminiOptions): NodeJS.ProcessEnv {
   // (Gemini CLI prefers GOOGLE_API_KEY over GEMINI_API_KEY when both are set)
   if (!useVertexAI && env.GOOGLE_API_KEY) {
     delete env.GOOGLE_API_KEY;
-    if (options.debug) {
-      console.log('[SDK] Removed GOOGLE_API_KEY from environment (not using Vertex AI)');
-    }
+    logger.debug('Removed GOOGLE_API_KEY from environment (not using Vertex AI)');
   }
 
   // Debug mode
   if (options.debug) {
     env.DEBUG = '1';
-    console.log('[SDK] Environment variables set:', {
+    logger.debug('Environment variables set:', {
       GEMINI_API_KEY: env.GEMINI_API_KEY ? '***' : undefined,
       GOOGLE_API_KEY: env.GOOGLE_API_KEY ? '***' : undefined,
       GOOGLE_GENAI_USE_VERTEXAI: env.GOOGLE_GENAI_USE_VERTEXAI,
@@ -148,6 +143,12 @@ export async function* query(
   prompt: string,
   options: GeminiOptions,
 ): AsyncGenerator<JsonStreamEvent> {
+  // Initialize logger
+  const logger = createLogger('GeminiSDK', {
+    logger: options.logger,
+    level: options.debug ? LogLevel.DEBUG : LogLevel.INFO,
+  });
+
   // Validate required options
   if (!options.pathToGeminiCLI) {
     throw new GeminiSDKError('pathToGeminiCLI is required');
@@ -161,7 +162,7 @@ export async function* query(
 
   // Build CLI arguments and environment
   const args = buildCliArgs(options, prompt);
-  const env = buildEnv(options);
+  const env = buildEnv(options, logger);
   const cwd = options.cwd || process.cwd();
 
   // Use custom Node.js path if provided, otherwise default to 'node'
@@ -183,9 +184,7 @@ export async function* query(
   const stderrChunks: Buffer[] = [];
   geminiProcess.stderr?.on('data', (data: Buffer) => {
     stderrChunks.push(data);
-    if (options.debug) {
-      console.error('[Gemini CLI stderr]:', data.toString());
-    }
+    logger.error('stderr:', data.toString());
   });
 
   // Setup timeout if specified
@@ -214,10 +213,8 @@ export async function* query(
         yield event;
       } catch (parseError) {
         // Log parse errors but continue processing
-        if (options.debug) {
-          console.error('[Gemini SDK] Failed to parse JSON line:', line);
-          console.error('[Gemini SDK] Parse error:', parseError);
-        }
+        logger.debug('Failed to parse JSON line:', line);
+        logger.debug('Parse error:', parseError);
       }
     }
   } catch (error) {

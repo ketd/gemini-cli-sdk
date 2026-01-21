@@ -36,6 +36,17 @@ export { query } from './query';
 export { GeminiClient } from './client';
 export { GeminiStreamClient } from './streamClient';
 
+// Logger
+export {
+  SDKLogger,
+  createLogger,
+  sdkLogger,
+  silentLogger,
+  LogLevel,
+  type Logger,
+  type LoggerOptions,
+} from './logger';
+
 // Types
 export type {
   GeminiOptions,

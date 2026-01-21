@@ -24,6 +24,7 @@ import {
   GeminiSDKError,
   ProcessStatus,
 } from './types.js';
+import { createLogger, LogLevel, type SDKLogger } from './logger.js';
 
 /**
  * Events emitted by GeminiStreamClient
@@ -80,9 +81,16 @@ export class GeminiStreamClient extends EventEmitter {
   private initEvent: InitEvent | null = null;
   private initTimeout: NodeJS.Timeout | null = null;
   private tempSettingsPath: string | null = null;
+  private logger: SDKLogger;
 
   constructor(private options: GeminiStreamOptions) {
     super();
+
+    // Initialize logger
+    this.logger = createLogger('GeminiStreamClient', {
+      logger: options.logger,
+      level: options.debug ? LogLevel.DEBUG : LogLevel.INFO,
+    });
 
     // Validate required options
     if (!options.pathToGeminiCLI) {
@@ -160,10 +168,13 @@ export class GeminiStreamClient extends EventEmitter {
     // Handle stderr (always process to prevent mixing with stdout)
     if (this.process.stderr) {
       this.process.stderr.on('data', (chunk) => {
-        // Only log in debug mode, but always consume stderr
-        if (this.options.debug) {
-          console.error('[GeminiStreamClient] stderr:', chunk.toString());
+        const message = chunk.toString().trim();
+        // Skip informational messages that are not real errors
+        if (!message || message.includes('Flushing log events')) {
+          return;
         }
+        // Log actual errors/warnings
+        this.logger.error('stderr:', message);
       });
     }
 
@@ -334,11 +345,9 @@ export class GeminiStreamClient extends EventEmitter {
     if (this.tempSettingsPath) {
       try {
         fs.unlinkSync(this.tempSettingsPath);
-        if (this.options.debug) {
-          console.log('[GeminiStreamClient] Cleaned up temp settings:', this.tempSettingsPath);
-        }
+        this.logger.debug('Cleaned up temp settings:', this.tempSettingsPath);
       } catch (error) {
-        console.error('[GeminiStreamClient] Failed to clean up temp settings:', error);
+        this.logger.error('Failed to clean up temp settings:', error);
       }
       this.tempSettingsPath = null;
     }
@@ -393,9 +402,7 @@ export class GeminiStreamClient extends EventEmitter {
     // Ensure the directory exists
     if (!fs.existsSync(geminiConfigDir)) {
       fs.mkdirSync(geminiConfigDir, { recursive: true });
-      if (this.options.debug) {
-        console.log('[GeminiStreamClient] Created config directory:', geminiConfigDir);
-      }
+      this.logger.debug('Created config directory:', geminiConfigDir);
     }
 
     // Write settings.json to GEMINI_CONFIG_DIR
@@ -419,10 +426,8 @@ export class GeminiStreamClient extends EventEmitter {
 
     try {
       fs.writeFileSync(this.tempSettingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-      if (this.options.debug) {
-        console.log('[GeminiStreamClient] Wrote settings to:', this.tempSettingsPath);
-        console.log('[GeminiStreamClient] Settings content:', JSON.stringify(settings, null, 2));
-      }
+      this.logger.debug('Wrote settings to:', this.tempSettingsPath);
+      this.logger.debug('Settings content:', JSON.stringify(settings, null, 2));
     } catch (error) {
       throw new GeminiSDKError(`Failed to write settings file: ${error}`);
     }
@@ -445,9 +450,7 @@ export class GeminiStreamClient extends EventEmitter {
     // Resume from previous session file
     if (this.options.resumeSessionFilePath) {
       args.push('--resume-from-file', this.options.resumeSessionFilePath);
-      if (this.options.debug) {
-        console.log('[GeminiStreamClient] Resuming from session file:', this.options.resumeSessionFilePath);
-      }
+      this.logger.debug('Resuming from session file:', this.options.resumeSessionFilePath);
     }
 
     // Model
@@ -483,30 +486,22 @@ export class GeminiStreamClient extends EventEmitter {
       // For Google AI Studio, use GEMINI_API_KEY
       const useVertexAI = this.options.env?.GOOGLE_GENAI_USE_VERTEXAI === 'true';
 
-      if (this.options.debug) {
-        console.log('[GeminiStreamClient] buildEnv() - API Key prefix:', this.options.apiKey.substring(0, 3));
-        console.log('[GeminiStreamClient] buildEnv() - GOOGLE_GENAI_USE_VERTEXAI:', this.options.env?.GOOGLE_GENAI_USE_VERTEXAI);
-        console.log('[GeminiStreamClient] buildEnv() - useVertexAI:', useVertexAI);
-      }
+      this.logger.debug('buildEnv() - API Key prefix:', this.options.apiKey.substring(0, 3));
+      this.logger.debug('buildEnv() - GOOGLE_GENAI_USE_VERTEXAI:', this.options.env?.GOOGLE_GENAI_USE_VERTEXAI);
+      this.logger.debug('buildEnv() - useVertexAI:', useVertexAI);
 
       if (useVertexAI) {
         env.GOOGLE_API_KEY = this.options.apiKey;
-        if (this.options.debug) {
-          console.log('[GeminiStreamClient] buildEnv() - Setting GOOGLE_API_KEY for Vertex AI');
-        }
+        this.logger.debug('buildEnv() - Setting GOOGLE_API_KEY for Vertex AI');
       } else {
         env.GEMINI_API_KEY = this.options.apiKey;
-        if (this.options.debug) {
-          console.log('[GeminiStreamClient] buildEnv() - Setting GEMINI_API_KEY for AI Studio');
-        }
+        this.logger.debug('buildEnv() - Setting GEMINI_API_KEY for AI Studio');
       }
     }
 
-    if (this.options.debug) {
-      console.log('[GeminiStreamClient] buildEnv() - Final env has GOOGLE_API_KEY:', !!env.GOOGLE_API_KEY);
-      console.log('[GeminiStreamClient] buildEnv() - Final env has GEMINI_API_KEY:', !!env.GEMINI_API_KEY);
-      console.log('[GeminiStreamClient] buildEnv() - Final env GOOGLE_GENAI_USE_VERTEXAI:', env.GOOGLE_GENAI_USE_VERTEXAI);
-    }
+    this.logger.debug('buildEnv() - Final env has GOOGLE_API_KEY:', !!env.GOOGLE_API_KEY);
+    this.logger.debug('buildEnv() - Final env has GEMINI_API_KEY:', !!env.GEMINI_API_KEY);
+    this.logger.debug('buildEnv() - Final env GOOGLE_GENAI_USE_VERTEXAI:', env.GOOGLE_GENAI_USE_VERTEXAI);
 
     return env;
   }
@@ -520,21 +515,17 @@ export class GeminiStreamClient extends EventEmitter {
     }
 
     const json = JSON.stringify(message);
-    if (this.options.debug) {
-      console.log('[GeminiStreamClient] Writing message to stdin:', json.substring(0, 100));
-    }
+    this.logger.debug('Writing message to stdin:', json.substring(0, 100));
 
     const success = this.stdinStream.write(json + '\n', (error) => {
       if (error) {
-        console.error('[GeminiStreamClient] Write error:', error);
-      } else if (this.options.debug) {
-        console.log('[GeminiStreamClient] Write callback: message flushed to stdin');
+        this.logger.error('Write error:', error);
+      } else {
+        this.logger.debug('Write callback: message flushed to stdin');
       }
     });
 
-    if (this.options.debug) {
-      console.log('[GeminiStreamClient] Write success:', success, 'Stream writable:', this.stdinStream.writable);
-    }
+    this.logger.debug('Write success:', success, 'Stream writable:', this.stdinStream.writable);
   }
 
   /**
@@ -553,9 +544,6 @@ export class GeminiStreamClient extends EventEmitter {
 
       // Skip debug output lines (e.g., [MESSAGE_BUS], [PolicyEngine], etc.)
       if (trimmed.startsWith('[')) {
-        if (this.options.debug) {
-          console.log('[GeminiStreamClient] Skipping debug output:', trimmed.substring(0, 100));
-        }
         return;
       }
 
@@ -563,16 +551,13 @@ export class GeminiStreamClient extends EventEmitter {
         const event = JSON.parse(trimmed) as JsonStreamEvent;
         this.handleEvent(event);
       } catch (error) {
-        console.error('[GeminiStreamClient] Failed to parse JSON:', trimmed);
-        console.error('[GeminiStreamClient] Error:', error);
+        this.logger.error('Failed to parse JSON:', trimmed);
+        this.logger.error('Error:', error);
       }
     });
 
     this.readlineInterface.on('close', () => {
-      // stdout closed
-      if (this.options.debug) {
-        console.log('[GeminiStreamClient] readline interface closed');
-      }
+      // stdout closed - no need to log
     });
   }
 
@@ -631,9 +616,7 @@ export class GeminiStreamClient extends EventEmitter {
    * Handle process exit
    */
   private handleProcessExit(code: number | null, signal: NodeJS.Signals | null): void {
-    if (this.options.debug) {
-      console.log('[GeminiStreamClient] Process exited:', { code, signal });
-    }
+    this.logger.debug('Process exited:', { code, signal });
 
     if (code !== 0 && code !== null) {
       this.status = ProcessStatus.ERROR;
@@ -657,7 +640,7 @@ export class GeminiStreamClient extends EventEmitter {
    * Handle process error
    */
   private handleProcessError(error: Error): void {
-    console.error('[GeminiStreamClient] Process error:', error);
+    this.logger.error('Process error:', error);
     this.status = ProcessStatus.ERROR;
     this.emit('error', error);
   }

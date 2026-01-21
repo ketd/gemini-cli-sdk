@@ -4,6 +4,8 @@
  * Based on Gemini CLI v0.21.0+ interface specification
  */
 
+import type { Logger } from './logger.js';
+
 /**
  * Gemini CLI configuration options
  */
@@ -108,6 +110,22 @@ export interface GeminiOptions {
    * If not provided, falls back to Gemini CLI's built-in approval mechanism
    */
   onPermissionRequest?: (request: ToolPermissionRequest) => Promise<ToolPermissionDecision>;
+
+  /**
+   * Custom logger implementation
+   * If not provided, uses console with [GeminiSDK] prefix
+   * Set to silentLogger to disable all logging
+   *
+   * @example
+   * ```typescript
+   * import { silentLogger } from '@google/gemini-cli-sdk';
+   *
+   * const stream = query('Hello', {
+   *   logger: silentLogger, // Disable all logging
+   * });
+   * ```
+   */
+  logger?: Logger;
 }
 
 /**
@@ -704,4 +722,20 @@ export interface GeminiStreamOptions {
    * @example '/path/to/session-2025-01-01T12-00-abc123.json'
    */
   resumeSessionFilePath?: string;
+
+  /**
+   * Custom logger implementation
+   * If not provided, uses console with [GeminiStreamClient] prefix
+   * Set to silentLogger to disable all logging
+   *
+   * @example
+   * ```typescript
+   * import { silentLogger, GeminiStreamClient } from '@google/gemini-cli-sdk';
+   *
+   * const client = new GeminiStreamClient({
+   *   logger: silentLogger, // Disable all logging
+   * });
+   * ```
+   */
+  logger?: Logger;
 }
