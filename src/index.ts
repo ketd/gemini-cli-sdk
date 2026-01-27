@@ -73,6 +73,8 @@ export type {
   MCPServerConfig,
   MCPServersConfig,
   HooksConfiguration,
+  ToolsConfig,
+  ContextConfig,
 } from './types';
 
 export { JsonStreamEventType, JsonInputMessageType, ExitCode, ProcessStatus, GeminiSDKError } from './types';

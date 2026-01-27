@@ -583,10 +583,18 @@ export interface MCPServerConfig {
   /** Environment variables */
   env?: Record<string, string>;
 
-  /** URL for SSE transport */
+  /**
+   * Transport type for URL-based connections
+   * - 'http': Streamable HTTP transport (recommended for mcp-chrome)
+   * - 'sse': Server-Sent Events transport
+   * When not specified with url, defaults to 'http'
+   */
+  type?: 'http' | 'sse';
+
+  /** URL for the MCP server (used with type field) */
   url?: string;
 
-  /** URL for HTTP streaming transport */
+  /** URL for HTTP streaming transport (deprecated, use url with type: 'http') */
   httpUrl?: string;
 
   /** Custom headers for HTTP transports */
@@ -609,6 +617,42 @@ export interface MCPServerConfig {
  * MCP Servers configuration map
  */
 export type MCPServersConfig = Record<string, MCPServerConfig>;
+
+/**
+ * Tools configuration for Gemini CLI settings.json
+ * Used to configure custom tool discovery and execution commands
+ */
+export interface ToolsConfig {
+  /**
+   * Command to discover available tools
+   * @example '"node" "/path/to/discover-tools.cjs"'
+   */
+  discoveryCommand?: string;
+
+  /**
+   * Command to call/execute a tool
+   * @example '"node" "/path/to/call-tool.cjs"'
+   */
+  callCommand?: string;
+
+  /**
+   * Enable hooks for tool execution
+   * Set to true when using hooks configuration
+   */
+  enableHooks?: boolean;
+}
+
+/**
+ * Context configuration for Gemini CLI settings.json
+ * Used to configure context file settings
+ */
+export interface ContextConfig {
+  /**
+   * Name of the context file (e.g., 'AOE.md')
+   * Gemini CLI will look for this file in the working directory
+   */
+  fileName?: string;
+}
 
 /**
  * Options for GeminiStreamClient
@@ -738,4 +782,34 @@ export interface GeminiStreamOptions {
    * ```
    */
   logger?: Logger;
+
+  /**
+   * Tools configuration for Gemini CLI
+   * Configures custom tool discovery and execution commands
+   * Written to settings.json tools field
+   *
+   * @example
+   * ```typescript
+   * tools: {
+   *   discoveryCommand: '"node" "/path/to/discover-tools.cjs"',
+   *   callCommand: '"node" "/path/to/call-tool.cjs"',
+   *   enableHooks: true,
+   * }
+   * ```
+   */
+  tools?: ToolsConfig;
+
+  /**
+   * Context configuration for Gemini CLI
+   * Configures context file settings
+   * Written to settings.json context field
+   *
+   * @example
+   * ```typescript
+   * context: {
+   *   fileName: 'AOE.md',
+   * }
+   * ```
+   */
+  context?: ContextConfig;
 }

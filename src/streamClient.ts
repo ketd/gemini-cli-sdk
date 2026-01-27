@@ -111,8 +111,8 @@ export class GeminiStreamClient extends EventEmitter {
 
     this.status = ProcessStatus.RUNNING;
 
-    // Create temporary settings.json if hooks or mcpServers are configured
-    if (this.options.hooks || this.options.mcpServers) {
+    // Create settings.json if any settings options are configured
+    if (this.options.hooks || this.options.mcpServers || this.options.tools || this.options.context) {
       await this.createTempSettings();
     }
 
@@ -387,6 +387,9 @@ export class GeminiStreamClient extends EventEmitter {
    * Note: Gemini CLI does not support --settings-file parameter.
    * Instead, it loads settings from GEMINI_CONFIG_DIR/settings.json
    * where GEMINI_CONFIG_DIR is set via environment variable.
+   *
+   * This method merges with existing settings.json if present, preserving
+   * any configuration written by the host application (e.g., tools.discoveryCommand).
    */
   private async createTempSettings(): Promise<void> {
     // Get GEMINI_CONFIG_DIR from options.env
@@ -394,7 +397,7 @@ export class GeminiStreamClient extends EventEmitter {
 
     if (!geminiConfigDir) {
       throw new GeminiSDKError(
-        'GEMINI_CONFIG_DIR is required in options.env when using hooks or mcpServers. ' +
+        'GEMINI_CONFIG_DIR is required in options.env when using hooks, mcpServers, tools, or context. ' +
         'Please set options.env.GEMINI_CONFIG_DIR to a directory path.'
       );
     }
@@ -408,15 +411,40 @@ export class GeminiStreamClient extends EventEmitter {
     // Write settings.json to GEMINI_CONFIG_DIR
     this.tempSettingsPath = path.join(geminiConfigDir, 'settings.json');
 
-    // Build settings object
-    const settings: Record<string, unknown> = {};
+    // Read existing settings if present (to merge with)
+    let existingSettings: Record<string, unknown> = {};
+    if (fs.existsSync(this.tempSettingsPath)) {
+      try {
+        const content = fs.readFileSync(this.tempSettingsPath, 'utf-8');
+        existingSettings = JSON.parse(content);
+        this.logger.debug('Read existing settings:', JSON.stringify(existingSettings, null, 2));
+      } catch (error) {
+        this.logger.warn('Failed to read existing settings.json, will overwrite:', error);
+      }
+    }
+
+    // Merge with existing settings
+    const settings: Record<string, unknown> = { ...existingSettings };
+
+    // Add tools configuration if provided
+    if (this.options.tools || this.options.hooks) {
+      const existingTools = (settings.tools as Record<string, unknown>) || {};
+      settings.tools = {
+        ...existingTools,
+        ...this.options.tools,
+        // enableHooks is set to true if hooks are configured
+        ...(this.options.hooks ? { enableHooks: true } : {}),
+      };
+    }
 
     // Add hooks configuration if provided
     if (this.options.hooks) {
-      settings.tools = {
-        enableHooks: true,
-      };
       settings.hooks = this.options.hooks;
+    }
+
+    // Add context configuration if provided
+    if (this.options.context) {
+      settings.context = this.options.context;
     }
 
     // Add MCP servers configuration if provided
