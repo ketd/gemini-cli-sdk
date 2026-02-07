@@ -232,23 +232,36 @@ export class GeminiStreamClient extends EventEmitter {
    *
    * Used for edit/retry functionality where subsequent messages need to be discarded.
    *
-   * @param fromIndex - Index from which to truncate (0-based, inclusive)
+   * @param options - Truncation options: either keepUserTurns (preferred) or fromIndex (legacy)
    */
-  async truncateHistory(fromIndex: number): Promise<void> {
+  async truncateHistory(options: number | { keepUserTurns: number } | { fromIndex: number }): Promise<void> {
     if (!this.isReady()) {
       throw new GeminiSDKError('Client not ready. Call start() first.');
     }
 
-    if (fromIndex < 0) {
-      throw new GeminiSDKError('fromIndex must be non-negative');
+    let control: { subtype: 'truncate_history'; fromIndex?: number; keepUserTurns?: number };
+
+    if (typeof options === 'number') {
+      // Legacy: raw fromIndex
+      if (options < 0) {
+        throw new GeminiSDKError('fromIndex must be non-negative');
+      }
+      control = { subtype: 'truncate_history', fromIndex: options };
+    } else if ('keepUserTurns' in options) {
+      if (options.keepUserTurns < 0) {
+        throw new GeminiSDKError('keepUserTurns must be non-negative');
+      }
+      control = { subtype: 'truncate_history', keepUserTurns: options.keepUserTurns };
+    } else {
+      if (options.fromIndex < 0) {
+        throw new GeminiSDKError('fromIndex must be non-negative');
+      }
+      control = { subtype: 'truncate_history', fromIndex: options.fromIndex };
     }
 
     const message: JsonInputMessage = {
       type: JsonInputMessageType.CONTROL,
-      control: {
-        subtype: 'truncate_history',
-        fromIndex,
-      },
+      control,
       session_id: this.options.sessionId,
     };
 
@@ -280,6 +293,34 @@ export class GeminiStreamClient extends EventEmitter {
       control: {
         subtype: 'resume_session',
         sessionFilePath,
+      },
+      session_id: this.options.sessionId,
+    };
+
+    this.writeMessage(message);
+  }
+
+  /**
+   * Replace CLI in-memory history with provided contents
+   *
+   * This sends a control message to the CLI to:
+   * 1. Replace the entire in-memory history with the provided contents
+   * 2. Clear session.json (DB is the source of truth)
+   *
+   * Used when messages are deleted from DB and CLI history needs to be rebuilt.
+   *
+   * @param contents - Full replacement history in Gemini Content[] format
+   */
+  async replaceHistory(contents: Array<{ role: string; parts: unknown[] }>): Promise<void> {
+    if (!this.isReady()) {
+      throw new GeminiSDKError('Client not ready. Call start() first.');
+    }
+
+    const message: JsonInputMessage = {
+      type: JsonInputMessageType.CONTROL,
+      control: {
+        subtype: 'replace_history',
+        contents,
       },
       session_id: this.options.sessionId,
     };
@@ -474,12 +515,6 @@ export class GeminiStreamClient extends EventEmitter {
 
     // Note: Do NOT use --settings-file as it's not supported by Gemini CLI
     // Settings are loaded from GEMINI_CONFIG_DIR/settings.json instead
-
-    // Resume from previous session file
-    if (this.options.resumeSessionFilePath) {
-      args.push('--resume-from-file', this.options.resumeSessionFilePath);
-      this.logger.debug('Resuming from session file:', this.options.resumeSessionFilePath);
-    }
 
     // Model
     if (this.options.model) {

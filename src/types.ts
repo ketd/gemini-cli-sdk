@@ -493,7 +493,7 @@ export interface UserInputMessage {
 /**
  * Control subtypes for control messages
  */
-export type ControlSubtype = 'interrupt' | 'cancel' | 'shutdown' | 'truncate_history' | 'resume_session';
+export type ControlSubtype = 'interrupt' | 'cancel' | 'shutdown' | 'truncate_history' | 'resume_session' | 'replace_history';
 
 /**
  * Interrupt control - stop current processing
@@ -503,13 +503,21 @@ export interface InterruptControl {
 }
 
 /**
- * Truncate history control - remove messages from a specific index
+ * Truncate history control - remove messages from a specific index or by user turn count
  * Used for edit/retry functionality
+ *
+ * Two modes:
+ * - keepUserTurns: Semantic mode — keep N complete user turns (handles tool call Content items correctly)
+ * - fromIndex: Raw mode — truncate from a specific Content[] index (legacy, doesn't account for tool calls)
+ *
+ * When both are provided, keepUserTurns takes precedence.
  */
 export interface TruncateHistoryControl {
   subtype: 'truncate_history';
-  /** Index from which to truncate (0-based, inclusive) */
-  fromIndex: number;
+  /** Index from which to truncate (0-based, inclusive). Used when keepUserTurns is not set. */
+  fromIndex?: number;
+  /** Number of complete user turns to keep. The CLI scans its history to find the correct Content[] split point. */
+  keepUserTurns?: number;
 }
 
 /**
@@ -523,11 +531,21 @@ export interface ResumeSessionControl {
 }
 
 /**
+ * Replace history control - fully replace CLI in-memory history
+ * Used when messages are deleted from DB and CLI history needs to be rebuilt
+ */
+export interface ReplaceHistoryControl {
+  subtype: 'replace_history';
+  /** Full replacement history as Gemini Content[] format */
+  contents: Array<{ role: string; parts: unknown[] }>;
+}
+
+/**
  * Control message sent to CLI
  */
 export interface ControlInputMessage {
   type: JsonInputMessageType.CONTROL;
-  control: InterruptControl | TruncateHistoryControl | ResumeSessionControl;
+  control: InterruptControl | TruncateHistoryControl | ResumeSessionControl | ReplaceHistoryControl;
   session_id?: string;
 }
 
@@ -759,13 +777,6 @@ export interface GeminiStreamOptions {
    * ```
    */
   mcpServers?: MCPServersConfig;
-
-  /**
-   * Resume from a previous session file path
-   * If provided, Gemini CLI will load the session history using --resume flag
-   * @example '/path/to/session-2025-01-01T12-00-abc123.json'
-   */
-  resumeSessionFilePath?: string;
 
   /**
    * Custom logger implementation
