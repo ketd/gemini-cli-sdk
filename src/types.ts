@@ -196,6 +196,9 @@ export enum JsonStreamEventType {
 
   /** Model information */
   MODEL_INFO = 'model_info',
+
+  /** Ask user questions (CLI → Host) */
+  ASK_USER = 'ask_user',
 }
 
 /**
@@ -360,6 +363,45 @@ export interface ModelInfoEvent extends BaseJsonStreamEvent {
 }
 
 /**
+ * Question option for AskUserEvent
+ */
+export interface QuestionOption {
+  label: string;
+  description: string;
+}
+
+/**
+ * Question type for AskUserEvent
+ */
+export enum QuestionType {
+  CHOICE = 'choice',
+  TEXT = 'text',
+  YESNO = 'yesno',
+}
+
+/**
+ * Question in AskUserEvent
+ */
+export interface Question {
+  question: string;
+  header: string;
+  type?: QuestionType;
+  options?: QuestionOption[];
+  multiSelect?: boolean;
+  placeholder?: string;
+}
+
+/**
+ * Ask user event (CLI → Host)
+ * Emitted when the ask_user tool needs structured user input
+ */
+export interface AskUserEvent extends BaseJsonStreamEvent {
+  type: JsonStreamEventType.ASK_USER;
+  questions: Question[];
+  correlation_id: string;
+}
+
+/**
  * Union type of all JSON stream events
  */
 export type JsonStreamEvent =
@@ -373,7 +415,8 @@ export type JsonStreamEvent =
   | ResultEvent
   | ContentEvent
   | FinishedEvent
-  | ModelInfoEvent;
+  | ModelInfoEvent
+  | AskUserEvent;
 
 /**
  * Gemini CLI exit codes
@@ -477,6 +520,9 @@ export enum JsonInputMessageType {
 
   /** Control command */
   CONTROL = 'control',
+
+  /** Response to ask_user event (Host → CLI) */
+  ASK_USER_RESPONSE = 'ask_user_response',
 }
 
 /**
@@ -550,9 +596,19 @@ export interface ControlInputMessage {
 }
 
 /**
+ * Response to ask_user event (Host → CLI)
+ * Sent when the host has collected user answers for an ask_user request
+ */
+export interface AskUserResponseInputMessage {
+  type: JsonInputMessageType.ASK_USER_RESPONSE;
+  correlation_id: string;
+  answers: { [questionIndex: string]: string };
+}
+
+/**
  * Union type for input messages
  */
-export type JsonInputMessage = UserInputMessage | ControlInputMessage;
+export type JsonInputMessage = UserInputMessage | ControlInputMessage | AskUserResponseInputMessage;
 
 /**
  * Hook configuration types (from Gemini CLI)

@@ -23,6 +23,7 @@ import {
   InitEvent,
   GeminiSDKError,
   ProcessStatus,
+  type AskUserResponseInputMessage,
 } from './types.js';
 import { createLogger, LogLevel, type SDKLogger } from './logger.js';
 
@@ -323,6 +324,29 @@ export class GeminiStreamClient extends EventEmitter {
         contents,
       },
       session_id: this.options.sessionId,
+    };
+
+    this.writeMessage(message);
+  }
+
+  /**
+   * Send a response to an ask_user request from the CLI
+   *
+   * When the CLI emits an 'ask_user' event (from the ask_user tool),
+   * the host collects user answers and sends them back via this method.
+   *
+   * @param correlationId - The correlation_id from the AskUserEvent
+   * @param answers - Map of question index to user's answer string
+   */
+  sendAskUserResponse(correlationId: string, answers: { [questionIndex: string]: string }): void {
+    if (!this.isReady()) {
+      throw new GeminiSDKError('Client not ready. Call start() first.');
+    }
+
+    const message: AskUserResponseInputMessage = {
+      type: JsonInputMessageType.ASK_USER_RESPONSE,
+      correlation_id: correlationId,
+      answers,
     };
 
     this.writeMessage(message);

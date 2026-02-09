@@ -55,6 +55,7 @@ export type {
   JsonInputMessage,
   UserInputMessage,
   ControlInputMessage,
+  AskUserResponseInputMessage,
   InterruptControl,
   TruncateHistoryControl,
   ResumeSessionControl,
@@ -66,6 +67,9 @@ export type {
   ThoughtEvent,
   ErrorEvent,
   ResultEvent,
+  AskUserEvent,
+  Question,
+  QuestionOption,
   StreamStats,
   QueryResult,
   ToolPermissionRequest,
@@ -77,7 +81,7 @@ export type {
   ContextConfig,
 } from './types';
 
-export { JsonStreamEventType, JsonInputMessageType, ExitCode, ProcessStatus, GeminiSDKError } from './types';
+export { JsonStreamEventType, JsonInputMessageType, QuestionType, ExitCode, ProcessStatus, GeminiSDKError } from './types';
 
 // Utilities
 export { findGeminiCLI, validateApiKey, getApiKey, validateModel, formatDuration, formatTokens } from './utils';
